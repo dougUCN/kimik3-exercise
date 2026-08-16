@@ -366,3 +366,100 @@ def explain_gemm(name, d_in, d_out, layers, batch=1, prec="bf16", n_weights=1, h
     print(f"  intensity = {flops / 1e9:.2f} / {(wbytes + abytes) / 1e9:.2f} = {flops / (wbytes + abytes):.5f} FLOP/byte")
     print(f"  ideal (weights only) = 2 x {batch} / {bpw} = {2 * batch / bpw:.3f}")
     return flops / (wbytes + abytes)
+
+
+def build_ops_prefill(c, chunk=4096, prior=0, hw=None):
+    """One row per operation for a PREFILL chunk.
+
+    Real engines chunk prefill rather than swallowing a whole prompt, so this
+    models one chunk of `chunk` tokens with `prior` tokens already cached.
+
+    Three things differ from decode:
+      * every GEMM runs `chunk` tokens through the same weights, so FLOPs scale
+        with chunk while weight bytes do not -- this is what lifts intensity
+      * attention is causal over prior+chunk keys, so its FLOPs go quadratic
+      * with thousands of tokens routing independently, essentially every expert
+        wakes, so the whole bank is read rather than 16 per layer
+    """
+    hw = hw or GPU()
+    d = c.d_model
+    inner = c.kda_heads * c.kda_head_dim
+    plan = ["mla" if (i % 4 == 0 or i == c.n_layers) else "kda" for i in range(1, c.n_layers + 1)]
+    n_mla, n_kda = plan.count("mla"), plan.count("kda")
+    n_moe = c.n_moe_layers
+    B = chunk
+
+    ops = [
+        _gemm("kda.qkv_proj", "KDA", n_kda, d, inner, B, n_weights=3),
+        _gemm("kda.gate", "KDA", n_kda, d, inner, B),
+        _gemm("kda.out", "KDA", n_kda, inner, d, B),
+        _gemm("kda.alpha", "KDA", n_kda, d, c.kda_alpha_rank, B),
+        _gemm("kda.alpha_up", "KDA", n_kda, c.kda_alpha_rank, inner, B),
+        _gemm("kda.beta", "KDA", n_kda, d, c.kda_heads, B),
+        _gemm("mla.q_down", "MLA", n_mla, d, c.q_lora_rank, B),
+        _gemm("mla.q_up", "MLA", n_mla, c.q_lora_rank, c.n_heads * c.qk_head_dim, B),
+        _gemm("mla.kv_down", "MLA", n_mla, d, c.kv_lora_rank + c.qk_rope_head_dim, B),
+        _gemm("mla.gate", "MLA", n_mla, d, c.n_heads * c.v_head_dim, B),
+        _gemm("mla.out", "MLA", n_mla, c.n_heads * c.v_head_dim, d, B),
+        _gemm("moe.router", "MoE", n_moe, d, c.n_routed, B),
+        _gemm("moe.w_down", "MoE", n_moe, d, c.d_latent_moe, B),
+        _gemm("moe.w_up", "MoE", n_moe, c.d_latent_moe, d, B),
+        _gemm("moe.shared", "MoE", n_moe, d, c.d_ff_shared, B, n_weights=3 * c.n_shared),
+        _gemm("lm_head", "Head", 1, d, c.d_vocab, B),
+    ]
+
+    live = experts_touched(c.n_routed, c.n_active_routed, B)
+    per_expert = 3 * c.d_latent_moe * c.d_ff_expert
+    ops.append(
+        dict(
+            op="moe.experts",
+            group="MoE",
+            count=n_moe,
+            precision="mxfp4",
+            flops=n_moe * 2 * B * c.n_active_routed * per_expert,
+            weight_bytes=n_moe * live * per_expert * BYTES["mxfp4"],
+            act_bytes=n_moe * B * c.n_active_routed
+            * (c.d_latent_moe + 3 * c.d_ff_expert) * BYTES["fp8"],
+        )
+    )
+
+    # causal pairs: each query in the chunk sees all `prior` keys plus the part
+    # of its own chunk up to itself -> chunk*prior + chunk*(chunk+1)/2
+    pairs = B * prior + B * (B + 1) / 2
+    entry = (c.kv_lora_rank + c.qk_rope_head_dim) * BYTES["bf16"]
+    ops.append(
+        dict(
+            op="mla.attn (causal)",
+            group="MLA",
+            count=n_mla,
+            precision="bf16",
+            flops=n_mla * 2 * pairs * c.n_heads * (c.qk_head_dim + c.v_head_dim),
+            weight_bytes=0.0,
+            act_bytes=n_mla * (prior + B) * entry,  # read prior, write this chunk
+        )
+    )
+
+    # KDA chunkwise scan: state touched once per chunk, work scales with tokens
+    state = c.kda_heads * c.kda_head_dim * c.kda_head_dim * BYTES["bf16"]
+    ops.append(
+        dict(
+            op="kda.recurrence",
+            group="KDA",
+            count=n_kda,
+            precision="bf16",
+            flops=n_kda * B * 6 * c.kda_heads * c.kda_head_dim * c.kda_head_dim,
+            weight_bytes=0.0,
+            act_bytes=n_kda * (2 * state + B * inner * BYTES["bf16"]),
+        )
+    )
+
+    df = pd.DataFrame(ops)
+    df["bytes"] = df.weight_bytes + df.act_bytes
+    df["intensity"] = df.flops / df.bytes
+    for prec, peak in hw.peak.items():
+        df[f"t_compute_{prec}"] = df.flops / peak
+    df["t_compute"] = df.flops / df.precision.map(hw.peak)
+    df["t_memory"] = df.bytes / hw.bandwidth
+    df["bound"] = ["compute" if c_ > m else "memory" for c_, m in zip(df.t_compute, df.t_memory)]
+    df["t"] = df[["t_compute", "t_memory"]].max(axis=1)
+    return df.set_index("op").sort_values("t", ascending=False)
