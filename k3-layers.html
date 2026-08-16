@@ -1,0 +1,871 @@
+<title>K3 Layer Schematics</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg:        #f4f6f8;
+    --panel:     #ffffff;
+    --rule:      #d3d9e2;
+    --rule-soft: #e6eaf0;
+    --ink:       #14181f;
+    --ink-2:     #4a5464;
+    --ink-3:     #77839a;
+    --flow:      #2f6fb5;
+    --flow-soft: #e3edf8;
+    --hot:       #b45f10;
+    --hot-soft:  #fbeedd;
+    --cold:      #8a94a6;
+    --shadow:    0 1px 2px rgba(20,24,31,.06), 0 8px 24px -16px rgba(20,24,31,.25);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg:        #0f1319;
+      --panel:     #161b23;
+      --rule:      #2b333f;
+      --rule-soft: #212932;
+      --ink:       #e9edf3;
+      --ink-2:     #a8b3c4;
+      --ink-3:     #7b8699;
+      --flow:      #5b9bdc;
+      --flow-soft: #17283a;
+      --hot:       #e09443;
+      --hot-soft:  #2e2214;
+      --cold:      #6a7488;
+      --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg:        #0f1319;
+    --panel:     #161b23;
+    --rule:      #2b333f;
+    --rule-soft: #212932;
+    --ink:       #e9edf3;
+    --ink-2:     #a8b3c4;
+    --ink-3:     #7b8699;
+    --flow:      #5b9bdc;
+    --flow-soft: #17283a;
+    --hot:       #e09443;
+    --hot-soft:  #2e2214;
+    --cold:      #6a7488;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 8px 24px -16px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono, code, th, .dim, figcaption .k {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 14px; }
+
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  h1 {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 600;
+    letter-spacing: -.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; max-width: 62ch; color: var(--ink-2); font-size: 16.5px; }
+
+  h2 {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  h2 .count {
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: .04em;
+    color: var(--ink-3);
+    text-transform: none;
+  }
+
+  section { display: flex; flex-direction: column; gap: 18px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; }
+  .figbody { overflow-x: auto; padding: 20px 20px 8px; }
+  svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+
+  figcaption {
+    padding: 12px 20px 16px;
+    font-size: 13.5px;
+    color: var(--ink-2);
+    border-top: 1px solid var(--rule-soft);
+    max-width: 78ch;
+  }
+  figcaption .k { color: var(--ink); font-size: 12.5px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  thead th {
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td { padding: 8px 14px; border-bottom: 1px solid var(--rule-soft); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  td.op  { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); }
+  td.shape {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+  tr.total td {
+    border-top: 1px solid var(--rule);
+    font-weight: 600;
+    background: var(--rule-soft);
+  }
+  tr.sparse td.num, tr.sparse td.shape, tr.sparse td.op { color: var(--cold); }
+
+  .tag {
+    display: inline-block;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10.5px;
+    letter-spacing: .05em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    border: 1px solid currentColor;
+    vertical-align: 1px;
+  }
+  .tag.hot  { color: var(--hot); background: var(--hot-soft); }
+  .tag.cold { color: var(--cold); }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    font-size: 12.5px;
+    color: var(--ink-2);
+    padding: 0;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 22px; height: 3px; border-radius: 2px; flex: none; }
+
+  .note {
+    font-size: 14px;
+    color: var(--ink-2);
+    max-width: 70ch;
+    margin: 0;
+  }
+  .note strong { color: var(--ink); font-weight: 600; }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 0;
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Kimi K3 · 2.78T total · 104.2B active</div>
+    <h1>K3 Layer Schematics</h1>
+    <p class="lede">
+      Every matmul in a Kimi&nbsp;K3 layer, drawn with real shapes from
+      <code>moonshotai/Kimi-K3</code>. A weight of shape <code>in&times;out</code> costs
+      <code>2&middot;in&middot;out</code> FLOPs per token — so each ledger below doubles
+      straight into inference cost.
+    </p>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--flow)"></span> tensor path</span>
+      <span><span class="sw" style="background:var(--hot)"></span> fires on every token</span>
+      <span><span class="sw" style="background:var(--cold)"></span> resident but idle</span>
+    </div>
+  </header>
+
+  <!-- ============ BLOCK PATTERN ============ -->
+  <section>
+    <h2>Layer stack <span class="count">93 layers · 3 KDA + 1 MLA, repeating</span></h2>
+    <div class="panel">
+      <figure>
+        <div class="figbody">
+          <svg viewBox="0 0 940 128" role="img"
+               aria-label="93 layers alternating three KDA layers then one Gated MLA layer, with an extra MLA layer at position 93">
+            <g font-family="ui-monospace, Menlo, monospace" font-size="11">
+              <text x="0" y="14" fill="var(--ink-3)">layer 1</text>
+              <text x="440" y="14" fill="var(--ink-3)">48</text>
+              <text x="880" y="14" fill="var(--ink-3)">93</text>
+            </g>
+            <!-- 93 ticks: i%4==0 or i==93 => MLA -->
+            <g id="ticks">
+              <!-- generated below as explicit rects, 9px pitch starting x=0 -->
+              <rect x="0"   y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="9"   y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="18"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="27"  y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="36"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="45"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="54"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="63"  y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="72"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="81"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="90"  y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="99"  y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="108" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="117" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="126" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="135" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="144" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="153" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="162" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="171" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="180" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="189" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="198" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="207" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="216" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="225" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="234" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="243" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="252" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="261" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="270" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="279" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="288" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="297" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="306" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="315" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="324" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="333" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="342" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="351" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="360" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="369" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="378" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="387" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="396" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="405" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="414" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="423" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="432" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="441" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="450" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="459" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="468" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="477" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="486" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="495" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="504" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="513" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="522" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="531" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="540" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="549" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="558" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="567" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="576" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="585" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="594" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="603" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="612" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="621" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="630" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="639" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="648" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="657" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="666" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="675" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="684" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="693" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="702" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="711" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="720" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="729" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="738" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="747" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="756" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="765" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="774" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="783" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="792" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="801" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="810" y="26" width="6" height="44" rx="1" fill="var(--flow)"/>
+              <rect x="819" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+              <rect x="828" y="26" width="6" height="44" rx="1" fill="var(--hot)"/>
+            </g>
+            <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
+              <rect x="0" y="86" width="10" height="10" rx="2" fill="var(--flow)"/>
+              <text x="16" y="95" fill="var(--ink-2)">69 &times; KDA — linear attention, cost flat in context</text>
+              <rect x="392" y="86" width="10" height="10" rx="2" fill="var(--hot)"/>
+              <text x="408" y="95" fill="var(--ink-2)">24 &times; Gated MLA — global attention, cost grows with context</text>
+            </g>
+            <path d="M834 78 L834 108 L800 108" fill="none" stroke="var(--ink-3)" stroke-width="1"/>
+            <text x="795" y="112" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="11.5" fill="var(--ink-3)">layer 93 is an extra MLA, so the stack always ends global</text>
+          </svg>
+        </div>
+        <figcaption>
+          The hybrid is what keeps 1M context affordable. Only the
+          <span class="k">24</span> amber layers pay the term that scales with sequence length;
+          the <span class="k">69</span> KDA layers carry a fixed-size recurrent state instead.
+          Drop the hybrid and make all 93 layers global, and the context at which attention
+          overtakes every weight matmul in the model falls from
+          <span class="k">141K</span> tokens to <span class="k">36K</span>.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ KDA ============ -->
+  <section>
+    <h2>Kimi Delta Attention <span class="count">&times;69 · 443.7M params · 96 heads &times; 128</span></h2>
+    <div class="panel">
+      <figure>
+        <div class="figbody">
+          <svg viewBox="0 0 700 470" role="img"
+               aria-label="KDA dataflow: six projections from the 7168-dim input feed a delta-rule recurrence, then head-wise RMSNorm, a sigmoid gate, and an output projection back to 7168">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="var(--flow)"/>
+              </marker>
+              <marker id="a1h" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="var(--hot)"/>
+              </marker>
+            </defs>
+
+            <!-- input -->
+            <rect x="290" y="10" width="120" height="30" rx="4"
+                  fill="var(--flow-soft)" stroke="var(--flow)" stroke-width="1"/>
+            <text x="350" y="30" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="12" fill="var(--flow)">x · 7168</text>
+
+            <!-- fan out -->
+            <path d="M350 40 L350 54 M60 54 L640 54" fill="none" stroke="var(--flow)" stroke-width="1.2"/>
+            <g stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)">
+              <path d="M60 54 L60 74"/><path d="M175 54 L175 74"/><path d="M290 54 L290 74"/>
+              <path d="M405 54 L405 74"/><path d="M520 54 L520 74"/><path d="M640 54 L640 74"/>
+            </g>
+
+            <!-- projection row -->
+            <g font-family="ui-monospace, Menlo, monospace" font-size="11">
+              <g fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2">
+                <rect x="12"  y="78" width="96" height="42" rx="4"/>
+                <rect x="127" y="78" width="96" height="42" rx="4"/>
+                <rect x="242" y="78" width="96" height="42" rx="4"/>
+                <rect x="357" y="78" width="96" height="42" rx="4"/>
+                <rect x="472" y="78" width="96" height="42" rx="4"/>
+                <rect x="592" y="78" width="96" height="42" rx="4"/>
+              </g>
+              <g text-anchor="middle" fill="var(--ink)">
+                <text x="60"  y="95">W_q</text><text x="175" y="95">W_k</text>
+                <text x="290" y="95">W_v</text><text x="405" y="95">W_β</text>
+                <text x="520" y="95">W_α ↓↑</text><text x="640" y="95">W_g</text>
+              </g>
+              <g text-anchor="middle" fill="var(--ink-3)" font-size="10">
+                <text x="60"  y="111">7168→12288</text><text x="175" y="111">7168→12288</text>
+                <text x="290" y="111">7168→12288</text><text x="405" y="111">7168→96</text>
+                <text x="520" y="111">7168→128→12288</text><text x="640" y="111">7168→12288</text>
+              </g>
+            </g>
+
+            <!-- to normalize row -->
+            <g stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)">
+              <path d="M60 120 L60 146"/><path d="M175 120 L175 146"/><path d="M290 120 L290 146"/>
+            </g>
+
+            <!-- normalize row -->
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10">
+              <g fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2">
+                <rect x="12"  y="150" width="96" height="36" rx="4"/>
+                <rect x="127" y="150" width="96" height="36" rx="4"/>
+                <rect x="242" y="150" width="96" height="36" rx="4"/>
+              </g>
+              <g text-anchor="middle" fill="var(--ink-2)">
+                <text x="60"  y="165">conv₄ · Swish</text><text x="60"  y="178">L2Norm</text>
+                <text x="175" y="165">conv₄ · Swish</text><text x="175" y="178">L2Norm</text>
+                <text x="290" y="171">conv₄ · Swish</text>
+              </g>
+            </g>
+
+            <!-- gates into recurrence -->
+            <g stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)">
+              <path d="M60 186 L60 210"/><path d="M175 186 L175 210"/><path d="M290 186 L290 210"/>
+              <path d="M405 120 L405 210"/>
+              <path d="M520 120 L520 210"/>
+            </g>
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--ink-3)"
+               text-anchor="middle">
+              <text x="428" y="170">β = σ(·)</text>
+              <text x="543" y="170">α = e^g</text>
+            </g>
+
+            <!-- recurrence -->
+            <rect x="12" y="214" width="556" height="66" rx="4"
+                  fill="var(--flow-soft)" stroke="var(--flow)" stroke-width="1.4"/>
+            <text x="290" y="238" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="12" fill="var(--ink)">delta-rule recurrence</text>
+            <text x="290" y="256" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--flow)">S ← (I − βkkᵀ)·diag(α)·S + βkvᵀ</text>
+            <text x="290" y="272" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="10.5" fill="var(--ink-3)">state 128×128 per head · no dependence on context length</text>
+
+            <!-- down to rmsnorm -->
+            <path d="M290 280 L290 306" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)"/>
+            <rect x="212" y="310" width="156" height="34" rx="4"
+                  fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
+            <text x="290" y="331" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink-2)">RMSNorm (per head)</text>
+
+            <!-- gate merge -->
+            <path d="M290 344 L290 374" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)"/>
+            <path d="M640 120 L640 388 L316 388" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)"/>
+            <text x="632" y="250" text-anchor="end" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">σ(W_g x)</text>
+            <circle cx="290" cy="388" r="14" fill="var(--panel)" stroke="var(--flow)" stroke-width="1.4"/>
+            <text x="290" y="393" text-anchor="middle" font-size="14" fill="var(--flow)">⊙</text>
+
+            <!-- o_proj -->
+            <path d="M290 402 L290 418" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a1)"/>
+            <rect x="222" y="422" width="136" height="34" rx="4"
+                  fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2"/>
+            <text x="290" y="437" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">W_o</text>
+            <text x="290" y="450" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">12288→7168</text>
+          </svg>
+        </div>
+        <figcaption>
+          Five of the six projections are the same <span class="k">7168&times;12288</span> shape —
+          <span class="k">88.1M</span> params each, and together they are
+          <span class="k">99.3%</span> of the layer. The interesting parts of KDA
+          (the decay <span class="k">α</span>, the write strength <span class="k">β</span>,
+          the short convolutions) are nearly free. Note the inner width is
+          <span class="k">12288</span>, wider than the <span class="k">7168</span> residual stream.
+        </figcaption>
+      </figure>
+      <hr />
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Weight</th><th>Shape</th><th>Params</th><th>MFLOP/token</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="op">W_q</td><td class="shape">7168 × 12288</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_k</td><td class="shape">7168 × 12288</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_v</td><td class="shape">7168 × 12288</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_g</td><td class="shape">7168 × 12288</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_o</td><td class="shape">12288 × 7168</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_α↑</td><td class="shape">128 × 12288</td><td class="num">1.57M</td><td class="num">3.1</td></tr>
+            <tr><td class="op">W_α↓</td><td class="shape">7168 × 128</td><td class="num">0.92M</td><td class="num">1.8</td></tr>
+            <tr><td class="op">W_β</td><td class="shape">7168 × 96</td><td class="num">0.69M</td><td class="num">1.4</td></tr>
+            <tr><td class="op">conv₄ ×3</td><td class="shape">12288 × 4 depthwise</td><td class="num">0.15M</td><td class="num">0.3</td></tr>
+            <tr class="total"><td>per layer</td><td class="shape">×69 layers</td><td class="num">443.7M</td><td class="num">887.6</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MLA ============ -->
+  <section>
+    <h2>Gated MLA <span class="count">&times;24 · 232.2M params · 96 heads, NoPE</span></h2>
+    <div class="panel">
+      <figure>
+        <div class="figbody">
+          <svg viewBox="0 0 700 420" role="img"
+               aria-label="Gated MLA dataflow: queries and key-values pass through low-rank down and up projections, meet in scaled dot-product attention, then a sigmoid gate and output projection">
+            <defs>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="var(--hot)"/>
+              </marker>
+            </defs>
+
+            <rect x="290" y="10" width="120" height="30" rx="4"
+                  fill="var(--hot-soft)" stroke="var(--hot)" stroke-width="1"/>
+            <text x="350" y="30" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="12" fill="var(--hot)">x · 7168</text>
+
+            <path d="M350 40 L350 54 M130 54 L600 54" fill="none" stroke="var(--hot)" stroke-width="1.2"/>
+            <g stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)">
+              <path d="M130 54 L130 74"/><path d="M350 54 L350 74"/><path d="M600 54 L600 74"/>
+            </g>
+
+            <!-- down projections -->
+            <g font-family="ui-monospace, Menlo, monospace">
+              <g fill="var(--panel)" stroke="var(--hot)" stroke-width="1.2">
+                <rect x="62"  y="78" width="136" height="42" rx="4"/>
+                <rect x="282" y="78" width="136" height="42" rx="4"/>
+                <rect x="532" y="78" width="136" height="42" rx="4"/>
+              </g>
+              <g text-anchor="middle" fill="var(--ink)" font-size="11">
+                <text x="130" y="95">W_q↓ · RMSNorm</text>
+                <text x="350" y="95">W_kv↓ · RMSNorm</text>
+                <text x="600" y="95">W_g</text>
+              </g>
+              <g text-anchor="middle" fill="var(--ink-3)" font-size="10">
+                <text x="130" y="111">7168→1536</text>
+                <text x="350" y="111">7168→576</text>
+                <text x="600" y="111">7168→12288</text>
+              </g>
+            </g>
+
+            <g stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)">
+              <path d="M130 120 L130 146"/><path d="M350 120 L350 146"/>
+            </g>
+            <text x="365" y="138" font-family="ui-monospace, Menlo, monospace" font-size="10"
+                  fill="var(--ink-3)">← this 576 is the KV cache</text>
+
+            <!-- up projections -->
+            <g font-family="ui-monospace, Menlo, monospace">
+              <g fill="var(--panel)" stroke="var(--hot)" stroke-width="1.2">
+                <rect x="62"  y="150" width="136" height="42" rx="4"/>
+                <rect x="282" y="150" width="136" height="42" rx="4"/>
+              </g>
+              <g text-anchor="middle" fill="var(--ink)" font-size="11">
+                <text x="130" y="167">W_q↑</text><text x="350" y="167">W_kv↑</text>
+              </g>
+              <g text-anchor="middle" fill="var(--ink-3)" font-size="10">
+                <text x="130" y="183">1536→18432</text><text x="350" y="183">512→24576</text>
+              </g>
+            </g>
+
+            <g stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)">
+              <path d="M130 192 L130 218"/><path d="M350 192 L350 218"/>
+            </g>
+            <g font-family="ui-monospace, Menlo, monospace" font-size="10" fill="var(--ink-3)">
+              <text x="140" y="210">q: 96×192</text>
+              <text x="360" y="210">k,v: 96×128 each</text>
+            </g>
+
+            <!-- attention -->
+            <rect x="62" y="222" width="356" height="66" rx="4"
+                  fill="var(--hot-soft)" stroke="var(--hot)" stroke-width="1.4"/>
+            <text x="240" y="246" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="12" fill="var(--ink)">softmax(qkᵀ/√d) · v</text>
+            <text x="240" y="265" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="10.5" fill="var(--hot)">no weights here — cost scales with context length s</text>
+            <text x="240" y="280" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10.5" fill="var(--ink-3)">2·s·96·192 + 2·s·96·128 = 61,440·s FLOP</text>
+
+            <!-- gate -->
+            <path d="M240 288 L240 322" stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)"/>
+            <path d="M600 120 L600 336 L266 336" stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)"/>
+            <text x="592" y="240" text-anchor="end" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">σ(W_g x)</text>
+            <circle cx="240" cy="336" r="14" fill="var(--panel)" stroke="var(--hot)" stroke-width="1.4"/>
+            <text x="240" y="341" text-anchor="middle" font-size="14" fill="var(--hot)">⊙</text>
+
+            <path d="M240 350 L240 366" stroke="var(--hot)" stroke-width="1.2" fill="none" marker-end="url(#a2)"/>
+            <rect x="172" y="370" width="136" height="34" rx="4"
+                  fill="var(--panel)" stroke="var(--hot)" stroke-width="1.2"/>
+            <text x="240" y="385" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">W_o</text>
+            <text x="240" y="398" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">12288→7168</text>
+          </svg>
+        </div>
+        <figcaption>
+          MLA's trick is the narrow waist: only the <span class="k">576</span>-dim latent is
+          cached per token, not 96 full heads. The attention block itself holds no weights,
+          which is exactly why it escapes the <span class="k">2N</span> rule — at 1M context
+          those two matmuls cost <span class="k">1,546 GFLOP</span> per token across the
+          24 MLA layers, roughly <span class="k">7&times;</span> every weight in the model combined.
+        </figcaption>
+      </figure>
+      <hr />
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Weight</th><th>Shape</th><th>Params</th><th>MFLOP/token</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="op">W_g</td><td class="shape">7168 × 12288</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_o</td><td class="shape">12288 × 7168</td><td class="num">88.08M</td><td class="num">176.2</td></tr>
+            <tr><td class="op">W_q↑</td><td class="shape">1536 × 18432</td><td class="num">28.31M</td><td class="num">56.6</td></tr>
+            <tr><td class="op">W_kv↑</td><td class="shape">512 × 24576</td><td class="num">12.58M</td><td class="num">25.2</td></tr>
+            <tr><td class="op">W_q↓</td><td class="shape">7168 × 1536</td><td class="num">11.01M</td><td class="num">22.0</td></tr>
+            <tr><td class="op">W_kv↓</td><td class="shape">7168 × 576</td><td class="num">4.13M</td><td class="num">8.3</td></tr>
+            <tr><td class="op">qkᵀ, ·v</td><td class="shape">context-dependent</td><td class="num">—</td><td class="num">0.061 · s</td></tr>
+            <tr class="total"><td>per layer</td><td class="shape">×24 layers</td><td class="num">232.2M</td><td class="num">464.4 + 0.061·s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MoE ============ -->
+  <section>
+    <h2>Stable LatentMoE <span class="count">&times;92 · 29.8G params · 718M active</span></h2>
+    <div class="panel">
+      <figure>
+        <div class="figbody">
+          <svg viewBox="0 0 700 450" role="img"
+               aria-label="Stable LatentMoE: two full-width shared experts run in parallel with a routed path that projects down to 3584, selects 16 of 896 experts, normalizes, and projects back up to 7168">
+            <defs>
+              <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="var(--flow)"/>
+              </marker>
+              <marker id="a3c" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M0 0 L10 5 L0 10 z" fill="var(--cold)"/>
+              </marker>
+            </defs>
+
+            <rect x="290" y="10" width="120" height="30" rx="4"
+                  fill="var(--flow-soft)" stroke="var(--flow)" stroke-width="1"/>
+            <text x="350" y="30" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="12" fill="var(--flow)">x · 7168</text>
+
+            <path d="M350 40 L350 54 M110 54 L560 54" fill="none" stroke="var(--flow)" stroke-width="1.2"/>
+            <g stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a3)">
+              <path d="M110 54 L110 74"/><path d="M350 54 L350 74"/><path d="M560 54 L560 74"/>
+            </g>
+
+            <!-- shared -->
+            <rect x="24" y="78" width="172" height="52" rx="4"
+                  fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2"/>
+            <text x="110" y="96" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">2 shared experts</text>
+            <text x="110" y="111" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">SiTU-GLU · 7168→3072→7168</text>
+            <text x="110" y="124" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="10" fill="var(--hot)">always on · full width</text>
+
+            <!-- router -->
+            <rect x="480" y="78" width="160" height="52" rx="4"
+                  fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2"/>
+            <text x="560" y="96" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">router</text>
+            <text x="560" y="111" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">7168→896 · σ, +bias</text>
+            <text x="560" y="124" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="10" fill="var(--ink-3)">top-16, bias frozen at inference</text>
+
+            <!-- down -->
+            <path d="M350 74 L350 146" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a3)"/>
+            <rect x="266" y="150" width="168" height="42" rx="4"
+                  fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2"/>
+            <text x="350" y="167" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">W↓</text>
+            <text x="350" y="182" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">7168→3584 · the latent waist</text>
+
+            <path d="M350 192 L350 214" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a3)"/>
+            <path d="M560 130 L560 208 L376 208" stroke="var(--flow)" stroke-width="1.2"
+                  fill="none" stroke-dasharray="3 3" marker-end="url(#a3)"/>
+            <text x="572" y="172" font-family="ui-monospace, Menlo, monospace" font-size="10"
+                  fill="var(--ink-3)">selects</text>
+
+            <!-- expert bank -->
+            <rect x="24" y="218" width="652" height="96" rx="4"
+                  fill="none" stroke="var(--rule)" stroke-width="1.2"/>
+            <text x="40" y="238" font-family="ui-monospace, Menlo, monospace" font-size="11"
+                  fill="var(--ink-2)">896 routed experts · SiTU-GLU 3584→3072→3584 · 33.0M each</text>
+
+            <!-- 16 hot + rest cold: draw 56 ticks, every 3.5th hot -> draw 16 hot explicitly -->
+            <g>
+              <rect x="40"  y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="51"  y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="62"  y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="73"  y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="84"  y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="95"  y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="106" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="117" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="128" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="139" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="150" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="161" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="172" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="183" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="194" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="205" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="216" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="227" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="238" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="249" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="260" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="271" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="282" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="293" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="304" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="315" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="326" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="337" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="348" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="359" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="370" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="381" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="392" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="403" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="414" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="425" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="436" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="447" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="458" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="469" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="480" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="491" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="502" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="513" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="524" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="535" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="546" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="557" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="568" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="579" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="590" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="601" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="612" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="623" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="634" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+              <rect x="645" y="250" width="8" height="30" rx="1.5" fill="var(--hot)"/>
+              <rect x="656" y="250" width="8" height="30" rx="1.5" fill="var(--rule)"/>
+            </g>
+            <text x="40" y="300" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11"
+                  fill="var(--hot)">16 fire — 528M params</text>
+            <text x="660" y="300" text-anchor="end" font-family="ui-sans-serif, system-ui, sans-serif"
+                  font-size="11" fill="var(--cold)">880 stay resident, cost 0 FLOPs</text>
+
+            <!-- norm + up -->
+            <path d="M350 314 L350 336" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a3)"/>
+            <rect x="266" y="340" width="168" height="32" rx="4"
+                  fill="var(--panel)" stroke="var(--rule)" stroke-width="1.2"/>
+            <text x="350" y="360" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink-2)">RMSNorm · new in K3</text>
+
+            <path d="M350 372 L350 392" stroke="var(--flow)" stroke-width="1.2" fill="none" marker-end="url(#a3)"/>
+            <rect x="266" y="396" width="168" height="40" rx="4"
+                  fill="var(--panel)" stroke="var(--flow)" stroke-width="1.2"/>
+            <text x="350" y="413" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="11" fill="var(--ink)">W↑</text>
+            <text x="350" y="427" text-anchor="middle" font-family="ui-monospace, Menlo, monospace"
+                  font-size="10" fill="var(--ink-3)">3584→7168</text>
+
+            <!-- shared rejoins -->
+            <path d="M110 130 L110 416 L260 416" stroke="var(--flow)" stroke-width="1.2"
+                  fill="none" marker-end="url(#a3)"/>
+            <text x="118" y="392" font-family="ui-monospace, Menlo, monospace" font-size="10"
+                  fill="var(--ink-3)">+ shared</text>
+          </svg>
+        </div>
+        <figcaption>
+          This is where the 2.78T lives — <span class="k">97.96%</span> of all parameters are
+          the 896-expert banks. The latent waist is the point: routed experts work at
+          <span class="k">3584</span> instead of <span class="k">7168</span>, so each costs
+          <span class="k">33.0M</span> rather than 132M, which is what makes 896 of them
+          affordable to store and 16 of them cheap to run.
+        </figcaption>
+      </figure>
+      <hr />
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Weight</th><th>Shape</th><th>Count</th><th>Params</th><th>MFLOP/token</th></tr>
+          </thead>
+          <tbody>
+            <tr class="sparse">
+              <td class="op">routed expert</td><td class="shape">3584 × 3072 × 3 (GLU)</td>
+              <td class="num">896 <span class="tag cold">stored</span></td>
+              <td class="num">29,595M</td><td class="num">—</td>
+            </tr>
+            <tr>
+              <td class="op">routed expert</td><td class="shape">3584 × 3072 × 3 (GLU)</td>
+              <td class="num">16 <span class="tag hot">fires</span></td>
+              <td class="num">528.5M</td><td class="num">1,057.0</td>
+            </tr>
+            <tr><td class="op">shared expert</td><td class="shape">7168 × 3072 × 3 (GLU)</td><td class="num">2</td><td class="num">132.1M</td><td class="num">264.2</td></tr>
+            <tr><td class="op">W↓</td><td class="shape">7168 × 3584</td><td class="num">1</td><td class="num">25.69M</td><td class="num">51.4</td></tr>
+            <tr><td class="op">W↑</td><td class="shape">3584 × 7168</td><td class="num">1</td><td class="num">25.69M</td><td class="num">51.4</td></tr>
+            <tr><td class="op">router</td><td class="shape">7168 × 896</td><td class="num">1</td><td class="num">6.42M</td><td class="num">12.8</td></tr>
+            <tr class="total"><td>per layer</td><td class="shape">×92 layers</td><td class="num">—</td><td class="num">718.4M active</td><td class="num">1,436.8</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TOTALS ============ -->
+  <section>
+    <h2>Per-token totals <span class="count">FLOP = 2 × active params</span></h2>
+    <div class="panel">
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr><th>Component</th><th>Instances</th><th>Total params</th><th>Active params</th><th>GFLOP/token</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="op">MoE routed</td><td class="num">92 × 896</td><td class="num">2,722.7G</td><td class="num">48.6G</td><td class="num">97.2</td></tr>
+            <tr><td class="op">KDA</td><td class="num">69</td><td class="num">30.6G</td><td class="num">30.6G</td><td class="num">61.2</td></tr>
+            <tr><td class="op">MoE shared</td><td class="num">92 × 2</td><td class="num">12.2G</td><td class="num">12.2G</td><td class="num">24.3</td></tr>
+            <tr><td class="op">Gated MLA</td><td class="num">24</td><td class="num">5.6G</td><td class="num">5.6G</td><td class="num">11.1</td></tr>
+            <tr><td class="op">MoE W↓ / W↑</td><td class="num">92</td><td class="num">4.7G</td><td class="num">4.7G</td><td class="num">9.5</td></tr>
+            <tr><td class="op">Output head</td><td class="num">1</td><td class="num">1.2G</td><td class="num">1.2G</td><td class="num">2.3</td></tr>
+            <tr class="sparse"><td class="op">Embedding</td><td class="num">1</td><td class="num">1.2G</td><td class="num">— lookup</td><td class="num">0</td></tr>
+            <tr><td class="op">Dense FFN</td><td class="num">1</td><td class="num">0.7G</td><td class="num">0.7G</td><td class="num">1.5</td></tr>
+            <tr><td class="op">Other</td><td class="num">—</td><td class="num">0.6G</td><td class="num">0.6G</td><td class="num">1.2</td></tr>
+            <tr class="total"><td>Kimi K3</td><td class="num">93 layers</td><td class="num">2,779.5G</td><td class="num">104.2G</td><td class="num">208.4 + attn</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="note">
+      <strong>The attention term is separate and it wins at long context.</strong>
+      The 208.4 GFLOP above covers every weight matmul. The 24 MLA layers add
+      <code>1.47M &times; s</code> FLOP on top, where <code>s</code> is context length —
+      6.0 GFLOP at 4K, but <strong>1,546 GFLOP at 1M</strong>. The crossover, where attention
+      starts costing more than all 104.2B active parameters, sits at
+      <strong>141K tokens</strong>. That single number is the argument for the 69:24 hybrid.
+    </p>
+  </section>
+
+</div>
