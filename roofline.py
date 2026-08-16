@@ -466,3 +466,44 @@ def build_ops_prefill(c, chunk=4096, prior=0, hw=None):
     df["bound"] = ["compute" if c_ > m else "memory" for c_, m in zip(df.t_compute, df.t_memory)]
     df["t"] = df[["t_compute", "t_memory"]].max(axis=1)
     return df.set_index("op").sort_values("t", ascending=False)
+
+
+PREFILL_LENGTHS = (512, 1024, 2048, 4096, 8192, 16384)
+
+
+def op_prefill_sweep(c, chunks=PREFILL_LENGTHS, prior=0, hw=None, metric="t"):
+    """Per-operation, per-ONE-layer cost across prefill chunk lengths.
+
+    Rows are operations. The first column pair is decode (one token); the rest
+    are prefill chunks of the given lengths. Values are for a single layer of
+    that type, so `kda.qkv_proj` is what one of the 69 KDA layers does.
+
+    metric: "t" microseconds, "flops" GFLOP, or "bytes" GB.
+    """
+    hw = hw or GPU()
+    scale = {"t": 1e6, "flops": 1e-9, "bytes": 1e-9}[metric]
+    col = {"t": "t", "flops": "flops", "bytes": "bytes"}[metric]
+
+    dec = build_ops(c, batch=1, seq=131_072, hw=hw)
+    data = {"decode": dec[col] / dec["count"] * scale}
+    bounds = {"decode": dec.bound}
+
+    for ch in chunks:
+        p = build_ops_prefill(c, chunk=ch, prior=prior, hw=hw)
+        p = p.reindex(dec.index.map(lambda i: i if i in p.index else "mla.attn (causal)"))
+        p.index = dec.index
+        data[f"C={ch}"] = p[col] / p["count"] * scale
+        bounds[f"C={ch}"] = p.bound
+
+    out = pd.DataFrame(data)
+    out.insert(0, "layers", dec["count"])
+    out.insert(0, "group", dec.group)
+
+    # smallest chunk at which the op stops waiting on memory
+    b = pd.DataFrame(bounds)
+    flip = []
+    for op in out.index:
+        hit = [ch for ch in chunks if b.loc[op, f"C={ch}"] == "compute"]
+        flip.append(f"C>={min(hit)}" if hit else "never")
+    out["compute-bound at"] = flip
+    return out.sort_values(["group", f"C={chunks[-1]}"], ascending=[True, False])
