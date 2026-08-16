@@ -563,3 +563,66 @@ def summary(dec, pre, chunk):
         },
         axis=1,
     )
+
+
+@dataclass
+class Fabric:
+    """NVLink 5 domain inside a GB300 NVL72 rack.
+
+    `latency` is the small-message floor for one collective -- the number that
+    decides everything at batch 1, where messages are only a few KB and nobody
+    is near bandwidth limited. It is an estimate, not a vendor figure; NCCL
+    all-reduce on tiny payloads typically lands in the 3-10 us range. Sweep it.
+    """
+
+    name: str = "NVLink 5 (in-rack)"
+    bw_per_gpu: float = 900e9  # bytes/s unidirectional (1.8 TB/s bidirectional)
+    latency: float = 5e-6      # s per collective
+    max_gpus: int = 72         # one NVL72 rack
+
+
+def allreduce_time(msg_bytes, n, fabric):
+    """Ring all-reduce: each GPU moves 2(n-1)/n of the payload, plus a fixed floor."""
+    if n <= 1:
+        return 0.0
+    return fabric.latency + 2 * (n - 1) / n * msg_bytes / fabric.bw_per_gpu
+
+
+def tensor_parallel(df, c, gpus, batch, hw=None, fabric=None, weights_gb=None):
+    """Critical-path time per step under tensor parallelism, vs GPU count.
+
+    Megatron-style sharding: column-parallel then row-parallel inside both the
+    attention block and the FFN, so each layer ends with one all-reduce of the
+    activation, twice per layer across the stack.
+
+    Both FLOPs and bytes shard by n, so arithmetic intensity is unchanged and no
+    operation switches which resource binds it -- the two shrink together. What
+    does not shrink is the collective, which is why the curve eventually flattens.
+    """
+    hw = hw or GPU()
+    fabric = fabric or Fabric()
+    n_collectives = 2 * c.n_layers
+    msg = batch * c.d_model * BYTES["bf16"]
+
+    # split the per-op critical path by which resource caused it
+    mem_ops = df[df.bound == "memory"].t.sum()
+    cmp_ops = df[df.bound == "compute"].t.sum()
+
+    rows = []
+    for n in gpus:
+        comm = n_collectives * allreduce_time(msg, n, fabric)
+        rows.append(
+            {
+                "GPUs": n,
+                "memory us": mem_ops / n * 1e6,
+                "compute us": cmp_ops / n * 1e6,
+                "nvlink us": comm * 1e6,
+                "total us": (mem_ops + cmp_ops) / n * 1e6 + comm * 1e6,
+                "GB/GPU": (weights_gb or 0) / n,
+                "fits": (weights_gb or 0) / n <= hw.hbm_bytes / 1e9,
+            }
+        )
+    out = pd.DataFrame(rows).set_index("GPUs")
+    out["speedup"] = out["total us"].iloc[0] / out["total us"]
+    out["comm share"] = out["nvlink us"] / out["total us"]
+    return out
