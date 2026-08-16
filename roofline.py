@@ -466,3 +466,59 @@ def build_ops_prefill(c, chunk=4096, prior=0, hw=None):
     df["bound"] = ["compute" if c_ > m else "memory" for c_, m in zip(df.t_compute, df.t_memory)]
     df["t"] = df[["t_compute", "t_memory"]].max(axis=1)
     return df.set_index("op").sort_values("t", ascending=False)
+
+
+def _group_rows(df, chunk):
+    """Aggregate a run to one row per layer type."""
+    g = df.groupby("group")
+    out = pd.DataFrame(
+        {
+            "layers": g["count"].max(),
+            "TFLOP": g.flops.sum() / 1e12,
+            "GB": g.bytes.sum() / 1e9,
+            "ms": g.t.sum() * 1e3,
+        }
+    )
+    out["us/layer"] = (df.t / df["count"]).groupby(df.group).sum() * 1e6
+    # where the time actually goes, not just how many ops are on each side
+    mem = df[df.bound == "memory"].groupby("group").t.sum().reindex(out.index).fillna(0)
+    share = mem / g.t.sum()
+    out["bound"] = [
+        "memory" if s > 0.9 else "compute" if s < 0.1 else f"mixed ({s:.0%} mem)"
+        for s in share
+    ]
+    return out
+
+
+def summary(dec, pre, chunk):
+    """One table: layer types down the side, decode and prefill across the top."""
+    d, p = _group_rows(dec, 1), _group_rows(pre, chunk)
+    order = ["KDA", "MLA", "MoE", "Head"]
+    d, p = d.reindex(order), p.reindex(order)
+
+    for frame, label in ((d, "decode"), (p, "prefill")):
+        frame.loc["TOTAL"] = [
+            frame.layers.sum(),
+            frame.TFLOP.sum(),
+            frame.GB.sum(),
+            frame.ms.sum(),
+            float("nan"),
+            "",
+        ]
+
+    tot_dec, tot_pre = dec.t.sum(), pre.t.sum()
+    d.loc["TOTAL", "bound"] = "memory"
+    p.loc["TOTAL", "bound"] = "mixed"
+
+    out = pd.concat(
+        {
+            "": d[["layers"]].astype(int),
+            "DECODE  (1 token)": d[["TFLOP", "GB", "ms", "bound"]],
+            f"PREFILL  ({chunk:,} tokens)": p[["TFLOP", "GB", "ms", "bound"]],
+        },
+        axis=1,
+    )
+    out[("", "layers")] = d.layers.astype(int)
+    out[("DECODE  (1 token)", "TFLOP")] = d.TFLOP
+    out[("PREFILL  (%s tokens)" % f"{chunk:,}", "us/token")] = p.ms * 1e3 / chunk
+    return out
