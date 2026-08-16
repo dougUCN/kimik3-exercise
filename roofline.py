@@ -339,3 +339,30 @@ def vs_ridge(df, hw=None):
     )
     out["shortfall"] = [f"{1 / r:,.0f}x under" if r < 1 else f"{r:.1f}x over" for r in out.ratio]
     return out
+
+
+def explain_gemm(name, d_in, d_out, layers, batch=1, prec="bf16", n_weights=1, heads=None):
+    """Print the FLOP and byte arithmetic for one GEMM, term by term."""
+    bpw = BYTES[prec]
+    params = n_weights * d_in * d_out
+    flops = layers * 2 * batch * params
+    wbytes = layers * params * bpw
+    abytes = layers * batch * (d_in + n_weights * d_out) * BYTES["bf16"]
+
+    print(f"{name}   ({layers} layers, batch {batch}, {prec})")
+    if heads:
+        print(f"  d_out  = {heads[0]} heads x {heads[1]} = {d_out}"
+              f"   <- heads are folded into one width, not a repeated matmul")
+    print(f"  params/layer  {n_weights} x {d_in} x {d_out} = {params:,}")
+    print()
+    print(f"  FLOPs   {layers} x 2 x {batch} x {params:,}")
+    print(f"          = {flops:,} = {flops / 1e9:.2f} GFLOP")
+    print(f"            the 2 is one multiply + one add per parameter")
+    print()
+    print(f"  weights {layers} x {params:,} x {bpw} B = {wbytes / 1e9:.2f} GB")
+    print(f"  activs  {layers} x {batch} x ({d_in} + {n_weights}x{d_out}) x 2 B = {abytes / 1e9:.4f} GB")
+    print(f"          = {(wbytes + abytes) / 1e9:.2f} GB total")
+    print()
+    print(f"  intensity = {flops / 1e9:.2f} / {(wbytes + abytes) / 1e9:.2f} = {flops / (wbytes + abytes):.5f} FLOP/byte")
+    print(f"  ideal (weights only) = 2 x {batch} / {bpw} = {2 * batch / bpw:.3f}")
+    return flops / (wbytes + abytes)
