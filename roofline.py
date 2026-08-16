@@ -626,3 +626,109 @@ def tensor_parallel(df, c, gpus, batch, hw=None, fabric=None, weights_gb=None):
     out["speedup"] = out["total us"].iloc[0] / out["total us"]
     out["comm share"] = out["nvlink us"] / out["total us"]
     return out
+
+
+def busiest_gpu_experts(k, batch, n_gpus):
+    """Expected expert-slots on the BUSIEST GPU under expert parallelism.
+
+    `k*batch` assignments land in `n_gpus` bins; the critical path is the fullest
+    bin, not the average. Two regimes:
+
+    * many assignments per GPU -> normal approximation, mu + sqrt(2 mu ln n)
+    * few -> Poisson tail, the largest t where at least one bin still holds >= t
+
+    At batch 1 this floors at 1: only 16 experts are ever selected, so past 16
+    GPUs the extras idle and per-GPU expert cost stops falling.
+    """
+    import math
+
+    m = k * batch
+    if n_gpus <= 1:
+        return float(m)
+    mu = m / n_gpus
+
+    if mu >= 20:  # law-of-large-numbers regime; imbalance is a small correction
+        return mu + math.sqrt(2 * mu * math.log(n_gpus))
+
+    t, tail, term = 0, 1.0, math.exp(-mu)
+    while n_gpus * tail >= 1.0 and t < m:
+        tail -= term
+        t += 1
+        term *= mu / t
+    return max(1.0, float(t))
+
+
+def expert_load_imbalance(k, batch, n_gpus, n_routed=None):
+    """Busiest-GPU load divided by the perfectly-balanced load."""
+    m = k * batch
+    if n_gpus <= 1 or m == 0:
+        return 1.0
+    return busiest_gpu_experts(k, batch, n_gpus) / (m / n_gpus)
+
+
+def hybrid_parallel(df, c, gpus, batch, hw=None, fabric=None, weights_gb=None,
+                    balanced=False):
+    """Tensor parallel on attention, EXPERT parallel on the MoE.
+
+    Attention shards every projection and pays one all-reduce per layer, as
+    before. The MoE instead distributes whole experts across GPUs and routes
+    tokens to them, which replaces the all-reduce with two all-to-alls per layer
+    (dispatch the latent, combine the result).
+
+    Two things worth noting, because neither is obvious:
+
+    * EP does not move fewer expert bytes than TP. Both spread the same total
+      expert read across n GPUs. What changes is the communication pattern and
+      the granularity -- EP reads whole experts, which are far better GEMM
+      shapes than 1/n-th slices.
+    * K3 dispatches the LATENT (3584), not the residual stream (7168), because
+      the routed path projects down before routing. That halves the all-to-all
+      payload relative to a conventional MoE.
+
+    `balanced=True` assumes perfect load balance (what Quantile Balancing aims
+    for); the default charges the busiest GPU, which is what actually gates.
+    """
+    hw = hw or GPU()
+    fabric = fabric or Fabric()
+
+    is_moe = df.group == "MoE"
+    moe, other = df[is_moe], df[~is_moe]
+
+    # attention + head: unchanged tensor parallelism
+    other_mem = other[other.bound == "memory"].t.sum()
+    other_cmp = other[other.bound == "compute"].t.sum()
+    attn_msg = batch * c.d_model * BYTES["bf16"]
+
+    moe_mem = moe[moe.bound == "memory"].t.sum()
+    moe_cmp = moe[moe.bound == "compute"].t.sum()
+
+    # all-to-all: k copies of the latent per token, dispatched then combined
+    a2a_total = batch * c.n_active_routed * c.d_latent_moe * BYTES["bf16"]
+
+    rows = []
+    for n in gpus:
+        imb = 1.0 if balanced else expert_load_imbalance(c.n_active_routed, batch, n)
+        busiest = busiest_gpu_experts(c.n_active_routed, batch, n)
+
+        attn_comm = c.n_layers * allreduce_time(attn_msg, n, fabric)
+        # per-GPU all-to-all volume, twice per MoE layer
+        a2a = a2a_total / n * (n - 1) / n if n > 1 else 0.0
+        moe_comm = 2 * c.n_moe_layers * (fabric.latency + a2a / fabric.bw_per_gpu) if n > 1 else 0.0
+
+        rows.append(
+            {
+                "GPUs": n,
+                "memory us": (other_mem / n + moe_mem / n * imb) * 1e6,
+                "compute us": (other_cmp / n + moe_cmp / n * imb) * 1e6,
+                "nvlink us": (attn_comm + moe_comm) * 1e6,
+                "attn comm us": attn_comm * 1e6,
+                "moe a2a us": moe_comm * 1e6,
+                "busiest GPU": busiest,
+                "imbalance": imb,
+                "fits": (weights_gb or 0) / n <= hw.hbm_bytes / 1e9,
+            }
+        )
+    out = pd.DataFrame(rows).set_index("GPUs")
+    out["total us"] = out["memory us"] + out["compute us"] + out["nvlink us"]
+    out["speedup"] = out["total us"].iloc[0] / out["total us"]
+    return out
