@@ -36,6 +36,10 @@ class K3Config:
     q_lora_rank: int = 1536
     kv_lora_rank: int = 512
     qk_nope_head_dim: int = 128
+    # config calls this "rope", but mla_use_nope=True and the modeling code sets
+    # rotary_emb=None -- nothing is ever rotated. The name is inherited from
+    # DeepSeek's MLA. Functionally these 64 dims are a head-shared (MQA) key
+    # channel: computed once per token, broadcast to all heads.
     qk_rope_head_dim: int = 64
     v_head_dim: int = 128
 
@@ -87,7 +91,11 @@ class KDA(nn.Module):
 
 
 class GatedMLA(nn.Module):
-    """Multi-head Latent Attention, NoPE, with full-rank output gate (Eq. 7)."""
+    """Multi-head Latent Attention, NoPE, with full-rank output gate (Eq. 7).
+
+    No positional encoding at all -- the KDA layers carry position. The 64
+    "rope" dims are real parameters but unrotated; see K3Config.
+    """
 
     def __init__(self, c: K3Config):
         super().__init__()

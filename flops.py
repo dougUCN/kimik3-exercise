@@ -213,3 +213,38 @@ def _plan(c):
         "mla" if (i % 4 == 0 or i == c.n_layers) else "kda"
         for i in range(1, c.n_layers + 1)
     ]
+
+
+def kv_cache_values(c):
+    """Cached values per token, per layer, for each caching scheme.
+
+    MHA caches every head's K and V. MLA caches only the shared latent plus the
+    one RoPE key, and reconstructs K and V on the fly. KDA caches nothing that
+    grows -- its state is fixed size.
+    """
+    return {
+        "MHA (all heads)": c.n_heads * c.qk_head_dim + c.n_heads * c.v_head_dim,
+        "MLA (latent)": c.kv_lora_rank + c.qk_rope_head_dim,
+    }
+
+
+def kv_cache_bytes(c, seq_len, bytes_per=2):
+    """Total KV-cache bytes at a given context length, bf16 by default.
+
+    Returns a dict of scheme -> bytes. The KDA entry is constant in seq_len,
+    which is the whole point of it.
+    """
+    n_mla = sum(1 for x in _plan(c) if x == "mla")
+    n_kda = c.n_layers - n_mla
+    per = kv_cache_values(c)
+
+    return {
+        "all-MHA (93 layers)": c.n_layers * per["MHA (all heads)"] * seq_len * bytes_per,
+        "all-MLA (93 layers)": c.n_layers * per["MLA (latent)"] * seq_len * bytes_per,
+        f"K3 MLA ({n_mla} layers)": n_mla * per["MLA (latent)"] * seq_len * bytes_per,
+        f"K3 KDA state ({n_kda} layers)": n_kda
+        * c.kda_heads
+        * c.kda_head_dim
+        * c.kda_head_dim
+        * bytes_per,
+    }

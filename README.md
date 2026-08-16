@@ -46,4 +46,4 @@ Kimi K3 — `2607.24653v2.pdf`
 
 Kimi Linear (KDA) — `2510.26692.pdf` — https://arxiv.org/abs/2510.26692
 
-Muon tutorial — ../muon-tutorial
+Model card and config — https://huggingface.co/moonshotai/Kimi-K3
