@@ -299,3 +299,43 @@ def balance_table(hw=None):
     return pd.Series(
         {f"{k} (FLOP/byte)": v for k, v in hw.balance.items()}, name=hw.name
     )
+
+
+def machine_intensity(hw=None):
+    """The GPU's own arithmetic intensity, a.k.a. machine balance or the
+    ridge point: peak FLOP/s divided by bandwidth, in FLOP/byte.
+
+    This is how much arithmetic the hardware can do per byte it can fetch.
+    An op must supply at least this much work per byte to keep the tensor
+    cores fed; supply less and you are bandwidth limited no matter what.
+    """
+    hw = hw or GPU()
+    return pd.DataFrame(
+        {
+            "peak (PFLOP/s)": {k: v / 1e15 for k, v in hw.peak.items()},
+            "bandwidth (TB/s)": {k: hw.bandwidth / 1e12 for k in hw.peak},
+            "machine intensity (FLOP/byte)": hw.balance,
+        }
+    )
+
+
+def vs_ridge(df, hw=None):
+    """How far each op sits below the machine's ridge point.
+
+    ratio = op intensity / machine intensity, at the op's own precision.
+    Below 1.0 means memory bound, by that factor.
+    """
+    hw = hw or GPU()
+    ridge = df.precision.map(hw.balance)
+    out = pd.DataFrame(
+        {
+            "group": df.group,
+            "precision": df.precision,
+            "op intensity": df.intensity,
+            "GB300 intensity": ridge,
+            "ratio": df.intensity / ridge,
+        },
+        index=df.index,
+    )
+    out["shortfall"] = [f"{1 / r:,.0f}x under" if r < 1 else f"{r:.1f}x over" for r in out.ratio]
+    return out
