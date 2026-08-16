@@ -565,27 +565,63 @@ def summary(dec, pre, chunk):
     )
 
 
+# Small-message all-reduce latency, microseconds, by GPU count.
+# "modern" = NCCL >= 2.27 symmetric-memory kernels + CUDA Graphs + 1 proc/GPU.
+# "legacy" = NCCL <= 2.26, or 2.27+ without symmetric registration / graphs --
+# which is the regime most published benchmarks are actually in.
+#
+# Sources: NVIDIA's NCCL 2.27 blog (GB200 NVL72, 32 ranks: 6.2 us @4KB,
+# ~8.8 @16KB); arXiv 2607.16100 Fig. 11 (GB200, NCCL 2.29 symmetric one-shot at
+# 128 B: 2.0 / 2.6 / 3.5 / 5.4 us at 8/16/32/64); nccl-tests #333 (8x B200,
+# 6 us @32KB symmetric vs 23 us non-symmetric); NCCL issue #1259 (8x H100,
+# 15.7 us @128B pre-2.27).
+ALLREDUCE_LATENCY_US = {
+    "modern": {1: 0.0, 2: 2.5, 4: 3.0, 8: 4.0, 16: 5.5, 32: 8.0, 64: 12.0, 72: 13.0},
+    "legacy": {1: 0.0, 2: 7.8, 4: 11.0, 8: 16.0, 16: 30.0, 32: 60.0, 64: 120.0, 72: 135.0},
+}
+
+
 @dataclass
 class Fabric:
     """NVLink 5 domain inside a GB300 NVL72 rack.
 
-    `latency` is the small-message floor for one collective -- the number that
-    decides everything at batch 1, where messages are only a few KB and nobody
-    is near bandwidth limited. It is an estimate, not a vendor figure; NCCL
-    all-reduce on tiny payloads typically lands in the 3-10 us range. Sweep it.
+    The collective latency floor is NOT a constant -- it grows with participant
+    count, and it moved by ~8x in mid-2025 when NCCL 2.27 shipped symmetric-memory
+    kernels. NVLink SHARP / multicast turns 2N-2 ring steps into 2 regardless of
+    N, which is worth ~5% at 8 GPUs and ~13-36% at 64; that is inside the ranges
+    below rather than modelled separately.
+
+    Speed of light on Blackwell NVLink is ~1.4 us for an all-reduce (arXiv
+    2607.16100), so nothing here can go below that.
     """
 
     name: str = "NVLink 5 (in-rack)"
     bw_per_gpu: float = 900e9  # bytes/s unidirectional (1.8 TB/s bidirectional)
-    latency: float = 5e-6      # s per collective
-    max_gpus: int = 72         # one NVL72 rack
+    stack: str = "modern"
+    max_gpus: int = 72
+    latency: float = None  # set to a float to override the table entirely
+
+    def latency_at(self, n):
+        """Seconds. Interpolated from the measured table unless overridden."""
+        if self.latency is not None:
+            return self.latency
+        table = ALLREDUCE_LATENCY_US[self.stack]
+        if n in table:
+            return table[n] * 1e-6
+        keys = sorted(table)
+        lo = max([k for k in keys if k <= n], default=keys[0])
+        hi = min([k for k in keys if k >= n], default=keys[-1])
+        if lo == hi:
+            return table[lo] * 1e-6
+        f = (n - lo) / (hi - lo)
+        return (table[lo] + f * (table[hi] - table[lo])) * 1e-6
 
 
 def allreduce_time(msg_bytes, n, fabric):
     """Ring all-reduce: each GPU moves 2(n-1)/n of the payload, plus a fixed floor."""
     if n <= 1:
         return 0.0
-    return fabric.latency + 2 * (n - 1) / n * msg_bytes / fabric.bw_per_gpu
+    return fabric.latency_at(n) + 2 * (n - 1) / n * msg_bytes / fabric.bw_per_gpu
 
 
 def tensor_parallel(df, c, gpus, batch, hw=None, fabric=None, weights_gb=None):
@@ -713,7 +749,7 @@ def hybrid_parallel(df, c, gpus, batch, hw=None, fabric=None, weights_gb=None,
         attn_comm = c.n_layers * allreduce_time(attn_msg, n, fabric)
         # per-GPU all-to-all volume, twice per MoE layer
         a2a = a2a_total / n * (n - 1) / n if n > 1 else 0.0
-        moe_comm = 2 * c.n_moe_layers * (fabric.latency + a2a / fabric.bw_per_gpu) if n > 1 else 0.0
+        moe_comm = 2 * c.n_moe_layers * (fabric.latency_at(n) + a2a / fabric.bw_per_gpu) if n > 1 else 0.0
 
         rows.append(
             {
