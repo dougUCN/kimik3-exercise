@@ -256,7 +256,7 @@ def footprint(c, hw=None):
     )
 
 
-def op_table(df, hw=None):
+def op_table(df, hw=None, per_layer=False):
     """The one table: work, traffic, intensity, and both bounds per operation.
 
     COMPUTE BOUND columns are t = flops / peak_flops(precision), i.e. how long
@@ -272,21 +272,24 @@ def op_table(df, hw=None):
     (peak_flops / bandwidth): above it compute bound, below it memory bound.
     """
     hw = hw or GPU()
+    n = df["count"] if per_layer else 1  # divide through to get one layer's share
     out = pd.DataFrame(
         {
-            "GFLOP": df.flops / 1e9,
-            "GB from DRAM": df.bytes / 1e9,
-            "intensity (FLOP/byte)": df.intensity,
-            "COMPUTE bf16 (us)": df.t_compute_bf16 * 1e6,
-            "COMPUTE fp8 (us)": df.t_compute_fp8 * 1e6,
-            "COMPUTE mxfp4 (us)": df.t_compute_mxfp4 * 1e6,
-            "MEMORY (us)": df.t_memory * 1e6,
+            "GFLOP": df.flops / n / 1e9,
+            "GB from DRAM": df.bytes / n / 1e9,
+            "intensity (FLOP/byte)": df.intensity,  # a ratio, so unchanged
+            "COMPUTE bf16 (us)": df.t_compute_bf16 / n * 1e6,
+            "COMPUTE fp8 (us)": df.t_compute_fp8 / n * 1e6,
+            "COMPUTE mxfp4 (us)": df.t_compute_mxfp4 / n * 1e6,
+            "MEMORY (us)": df.t_memory / n * 1e6,
         },
         index=df.index,
     )
     out.insert(0, "group", df.group)
+    if per_layer:
+        out.insert(1, "layers", df["count"])
     out["limited by"] = df.bound
-    return out
+    return out.sort_values(["group", "MEMORY (us)"], ascending=[True, False])
 
 
 def balance_table(hw=None):
