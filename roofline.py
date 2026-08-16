@@ -507,3 +507,59 @@ def op_prefill_sweep(c, chunks=PREFILL_LENGTHS, prior=0, hw=None, metric="t"):
         flip.append(f"C>={min(hit)}" if hit else "never")
     out["compute-bound at"] = flip
     return out.sort_values(["group", f"C={chunks[-1]}"], ascending=[True, False])
+
+
+def _group_rows(df):
+    """Aggregate a run to one row per layer type. Times in microseconds."""
+    g = df.groupby("group")
+    out = pd.DataFrame(
+        {
+            "layers": g["count"].max(),
+            "TFLOP": g.flops.sum() / 1e12,
+            "GB": g.bytes.sum() / 1e9,
+            "us": g.t.sum() * 1e6,
+        }
+    )
+    # where the TIME goes, not just how many ops sit on each side
+    mem = df[df.bound == "memory"].groupby("group").t.sum().reindex(out.index).fillna(0)
+    share = mem / g.t.sum()
+    out["bound"] = [
+        "memory" if s > 0.9 else "compute" if s < 0.1 else f"mixed ({s:.0%} mem)"
+        for s in share
+    ]
+    return out
+
+
+def summary(dec, pre, chunk):
+    """Aggregated: layer types down the side, decode and prefill across the top.
+
+    All times in microseconds. `us/token` divides each regime's total by the
+    tokens it produced -- 1 for decode, `chunk` for prefill -- which is the only
+    fair way to put the two side by side.
+    """
+    d, p = _group_rows(dec), _group_rows(pre)
+    order = ["KDA", "MLA", "MoE", "Head"]
+    d, p = d.reindex(order), p.reindex(order)
+
+    for frame, whole in ((d, dec), (p, pre)):
+        share = whole[whole.bound == "memory"].t.sum() / whole.t.sum()
+        frame.loc["TOTAL"] = [
+            frame.layers.sum(),
+            frame.TFLOP.sum(),
+            frame.GB.sum(),
+            frame.us.sum(),
+            "memory" if share > 0.9 else "compute" if share < 0.1 else f"mixed ({share:.0%} mem)",
+        ]
+
+    d["us/token"] = d.us
+    p["us/token"] = p.us / chunk
+    cols = ["TFLOP", "GB", "us", "us/token", "bound"]
+
+    return pd.concat(
+        {
+            "": d[["layers"]].astype(int),
+            "DECODE (1 token)": d[cols],
+            f"PREFILL ({chunk:,} tokens)": p[cols],
+        },
+        axis=1,
+    )
